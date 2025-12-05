@@ -15,7 +15,7 @@ EOF
 }
 
 cmd_status() {
-  echo status
+  echo status2
 }
 
 cmd_start() {
