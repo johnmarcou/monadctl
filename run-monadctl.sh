@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
-REMOTE_URL="https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl.sh"
+API_URL="https://api.github.com/repos/johnmarcou/monadctl/contents/monadctl?ref=main"
 
-curl -fsSL "$REMOTE_URL" | bash -s -- "$@"
+# Fetch base64 content
+CONTENT=$(curl -fsSL "$API_URL" | jq -r '.content' | tr -d '\n')
+
+# Decode + execute
+echo "$CONTENT" | base64 --decode | bash -s -- "$@"

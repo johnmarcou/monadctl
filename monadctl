@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ⚠️ This script is not officially supported
+# Use at your own risk.
+#
+# Install live version:
+#
+# $ install -m 0755 <(curl https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/run-monadctl.sh) /usr/local/bin/monadctl
+#
+
+usage() {
+  cat <<EOF
+monadctl – minimal control tool
+
+Usage:
+  monadctl status          # show status via remote monad-status script
+  monadctl start           # start monad-bft / monad-execution / monad-rpc
+  monadctl stop            # stop monad-bft / monad-execution / monad-rpc
+  monadctl restart         # restart monad-bft / monad-execution / monad-rpc
+  monadctl reset           # stop, reset workspace, rotate/vacuum logs, restart
+  monadctl flush           # stop, reset workspace, rotate/vacuum logs (no start)
+  monadctl hard-reset      # stop, reset workspace, rotate/vacuum logs, restore snapshot
+  monadctl init            # alias for reset (for now)
+EOF
+}
+
+cmd_config() {
+  cat /home/monad/monad-bft/config/node.toml
+}
+
+cmd_edit() {
+  exec vim /home/monad/monad-bft/config/node.toml </dev/tty >/dev/tty 2>&1
+}
+
+cmd_status() {
+  bash <(curl -fsSL "https://bucket.monadinfra.com/scripts/monad-status.sh") "$@"
+}
+
+cmd_start() {
+  systemctl start monad-bft monad-execution monad-rpc
+}
+
+cmd_stop() {
+  systemctl stop monad-bft monad-execution monad-rpc
+}
+
+cmd_restart() {
+  systemctl stop monad-bft monad-execution monad-rpc
+  sleep 2
+  systemctl start monad-bft monad-execution monad-rpc
+}
+
+cmd_reload() {
+  monad-debug-node -c /home/monad/monad-bft/controlpanel.sock reload-config
+}
+
+cmd_reset() {
+  systemctl stop monad-bft monad-execution monad-rpc
+  bash /opt/monad/scripts/reset-workspace.sh
+  journalctl --rotate && journalctl --vacuum-time=1s
+  sleep 1
+  systemctl start monad-bft monad-execution monad-rpc
+}
+
+cmd_flush() {
+  systemctl stop monad-bft monad-execution monad-rpc
+  bash /opt/monad/scripts/reset-workspace.sh
+  journalctl --rotate && journalctl --vacuum-time=1s
+}
+
+cmd_hard_reset() {
+  systemctl stop monad-bft monad-execution monad-rpc
+  bash /opt/monad/scripts/reset-workspace.sh
+  journalctl --rotate && journalctl --vacuum-time=1s
+  MF_BUCKET="https://bucket.monadinfra.com"
+  curl -fsSL "${MF_BUCKET}/scripts/mainnet/restore-from-snapshot.sh" | bash
+}
+
+cmd_init() {
+  set -x
+  NETWORK=${1:-mainnet}
+  DISK=${2:-nvme1n1}
+
+  systemctl stop monad-bft monad-execution monad-rpc || true
+
+  apt upgrade -y || true
+  apt install -y curl nvme-cli aria2 jq
+  cat <<EOF >/etc/apt/sources.list.d/category-labs.sources
+Types: deb
+URIs: https://pkg.category.xyz/
+Suites: noble
+Components: main
+Signed-By: /etc/apt/keyrings/category-labs.gpg
+EOF
+
+  curl -fsSL https://pkg.category.xyz/keys/public-key.asc |
+    gpg --dearmor --yes -o /etc/apt/keyrings/category-labs.gpg
+
+  apt update && apt install -y monad
+  useradd -m -s /bin/bash monad || true
+  mkdir -p /home/monad/monad-bft/config \
+    /home/monad/monad-bft/ledger \
+    /home/monad/monad-bft/config/forkpoint \
+    /home/monad/monad-bft/config/validators
+
+  TRIEDB_DRIVE="/dev/$DISK"
+  parted -s $TRIEDB_DRIVE mklabel gpt
+  parted -s $TRIEDB_DRIVE mkpart triedb 0% 100%
+  sleep 1
+  PARTUUID=$(lsblk -o PARTUUID $TRIEDB_DRIVE | tail -n 1)
+  echo "Disk PartUUID: ${PARTUUID}"
+  echo "ENV{ID_PART_ENTRY_UUID}==\"$PARTUUID\", MODE=\"0666\", SYMLINK+=\"triedb\"" |
+    tee /etc/udev/rules.d/99-triedb.rules
+  sleep 2
+  udevadm trigger
+  sleep 2
+  udevadm control --reload
+  sleep 2
+  udevadm settle
+  sleep 2
+  ls -l /dev/triedb
+
+  monad-mpt --storage /dev/triedb --create
+
+  ufw allow ssh
+  ufw allow 8000
+  ufw --force enable
+
+  OTEL_VERSION="0.139.0"
+  OTEL_PACKAGE="https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTEL_VERSION}/otelcol_${OTEL_VERSION}_linux_amd64.deb"
+  curl -fsSL "$OTEL_PACKAGE" -o /tmp/otelcol_linux_amd64.deb
+  dpkg -i /tmp/otelcol_linux_amd64.deb
+  cp /opt/monad/scripts/otel-config.yaml /etc/otelcol/config.yaml
+  systemctl restart otelcol
+
+  MF_BUCKET=https://bucket.monadinfra.com
+  curl -o /home/monad/.env $MF_BUCKET/config/${NETWORK}/latest/.env.example
+  curl -o /home/monad/monad-bft/config/node.toml $MF_BUCKET/config/${NETWORK}/latest/full-node-node.toml
+
+  sed -i "s|^KEYSTORE_PASSWORD=$|KEYSTORE_PASSWORD='$(openssl rand -base64 32)'|" /home/monad/.env
+  source /home/monad/.env
+  mkdir -p /opt/monad/backup/
+  echo "Keystore password: ${KEYSTORE_PASSWORD}" >/opt/monad/backup/keystore-password-backup
+
+  rm /home/monad/monad-bft/config/id-secp || true
+  rm /home/monad/monad-bft/config/id-bls || true
+
+  monad-keystore create \
+    --key-type secp \
+    --keystore-path /home/monad/monad-bft/config/id-secp \
+    --password "${KEYSTORE_PASSWORD}" >/opt/monad/backup/secp-backup
+
+  monad-keystore create \
+    --key-type bls \
+    --keystore-path /home/monad/monad-bft/config/id-bls \
+    --password "${KEYSTORE_PASSWORD}" >/opt/monad/backup/bls-backup
+
+  grep "public key" /opt/monad/backup/secp-backup /opt/monad/backup/bls-backup |
+    tee /home/monad/pubkey-secp-bls
+
+  source /home/monad/.env
+  sig_out="$(
+    monad-sign-name-record \
+      --address "$(curl -s4 ifconfig.me)":8000 \
+      --keystore-path /home/monad/monad-bft/config/id-secp \
+      --password "${KEYSTORE_PASSWORD}" \
+      --self-record-seq-num 0
+  )"
+
+  node_name_val="$(hostname)"
+  self_address=$(printf '%s\n' "$sig_out" | grep '^self_address' | cut -d'"' -f2)
+  self_record_seq_num=$(printf '%s\n' "$sig_out" | grep '^self_record_seq_num' | awk '{print $3}')
+  self_name_record_sig=$(printf '%s\n' "$sig_out" | grep '^self_name_record_sig' | cut -d'"' -f2)
+
+  sed -i \
+    -e "s|^node_name = \".*\"|node_name = \"$node_name_val\"|" \
+    -e "s|^self_address = \".*\"|self_address = \"$self_address\"|" \
+    -e "s|^self_record_seq_num = .*|self_record_seq_num = $self_record_seq_num|" \
+    -e "s|^self_name_record_sig = \".*\"|self_name_record_sig = \"$self_name_record_sig\"|" \
+    /home/monad/monad-bft/config/node.toml
+
+  chown -R monad:monad /home/monad/
+  systemctl enable monad-bft monad-execution monad-rpc
+
+}
+
+main() {
+  case "${1:-}" in
+  status)
+    shift
+    cmd_status "$@"
+    ;;
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  reset) cmd_reset ;;
+  reload) cmd_reload ;;
+  flush) cmd_flush ;;
+  edit) cmd_edit ;;
+  config) cmd_config ;;
+  hard-reset) cmd_hard_reset ;;
+  init)
+    shift
+    cmd_init "$@"
+    ;;
+  *) usage ;;
+  esac
+}
+
+main "$@"
