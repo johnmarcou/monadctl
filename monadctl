@@ -25,6 +25,32 @@ Usage:
 EOF
 }
 
+main() {
+  case "${1:-}" in
+  status)
+    shift
+    cmd_status "$@"
+    ;;
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  reset) cmd_reset ;;
+  reload) cmd_reload ;;
+  flush) cmd_flush ;;
+  edit) cmd_edit ;;
+  config) cmd_config ;;
+  hard-reset)
+    shift
+    cmd_hard_reset "$@"
+    ;;
+  init)
+    shift
+    cmd_init "$@"
+    ;;
+  *) usage ;;
+  esac
+}
+
 cmd_config() {
   cat /home/monad/monad-bft/config/node.toml
 }
@@ -69,17 +95,24 @@ cmd_flush() {
   journalctl --rotate && journalctl --vacuum-time=1s
 }
 
+log() {
+  echo "monadctl: $*"
+}
+
 cmd_hard_reset() {
+  NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' /home/monad/monad-bft/config/node.toml)
+  log "Hard resetting for $NETWORK network, and start monad services"
   systemctl stop monad-bft monad-execution monad-rpc
   bash /opt/monad/scripts/reset-workspace.sh
   journalctl --rotate && journalctl --vacuum-time=1s
   MF_BUCKET="https://bucket.monadinfra.com"
-  curl -fsSL "${MF_BUCKET}/scripts/mainnet/restore-from-snapshot.sh" | bash
+  curl -fsSL "${MF_BUCKET}/scripts/${NETWORK}/restore-from-snapshot.sh" | bash
+  systemctl start monad-bft monad-execution monad-rpc
 }
 
 cmd_init() {
   set -x
-  NETWORK=${1:-mainnet}
+  NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' /home/monad/monad-bft/config/node.toml)
   DISK=${2:-nvme1n1}
 
   systemctl stop monad-bft monad-execution monad-rpc || true
@@ -183,29 +216,6 @@ EOF
   chown -R monad:monad /home/monad/
   systemctl enable monad-bft monad-execution monad-rpc
 
-}
-
-main() {
-  case "${1:-}" in
-  status)
-    shift
-    cmd_status "$@"
-    ;;
-  start) cmd_start ;;
-  stop) cmd_stop ;;
-  restart) cmd_restart ;;
-  reset) cmd_reset ;;
-  reload) cmd_reload ;;
-  flush) cmd_flush ;;
-  edit) cmd_edit ;;
-  config) cmd_config ;;
-  hard-reset) cmd_hard_reset ;;
-  init)
-    shift
-    cmd_init "$@"
-    ;;
-  *) usage ;;
-  esac
 }
 
 main "$@"
