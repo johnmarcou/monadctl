@@ -3,9 +3,13 @@ set -euo pipefail
 
 # ⚠️ This script is experimental and not officially supported - Use at your own risk.
 #
-# Install live version:
+# Install:
 #
-# $ install -m 0755 <(curl https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/run-monadctl.sh) /usr/local/bin/monadctl
+# $ install -m 0755 <(curl https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl) /usr/local/bin/monadctl
+#
+# Run:
+#
+# $ monadctl up
 #
 
 CONFIG_FILE="/home/monad/monad-bft/config/node.toml"
