@@ -13,7 +13,7 @@ set -euo pipefail
 #
 # Install monad node only:
 #
-# curl -fsSL https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl | bash -s -- up mainnet nvme1n1
+# curl -fsSL https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl | bash -s -- up --network mainnet --disk nvme1n1
 #
 
 CONFIG_FILE="/home/monad/monad-bft/config/node.toml"
@@ -37,6 +37,10 @@ Usage:
   monadctl stop            # stop monad services
   monadctl up              # spin up a new node
   monadctl down            # stop monad services
+
+Examples:
+  monadctl up --network mainnet --disk nvme1n1
+
 EOF
 }
 
@@ -166,9 +170,31 @@ cmd_hard_reset() {
 }
 
 cmd_init() {
+  NETWORK=$DEFAULT_NETWORK
+  DISK="nvme1n1"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --network)
+      NETWORK="$2"
+      shift 2
+      ;;
+    --disk)
+      DISK="$2"
+      shift 2
+      ;;
+    -*)
+      echo "Unknown option for init: $1" >&2
+      exit 1
+      ;;
+    *)
+      echo "Unknown argument for init: $1" >&2
+      exit 1
+      ;;
+    esac
+  done
+
   set -x
-  NETWORK=${1:-$DEFAULT_NETWORK}
-  DISK=${2:-nvme1n1}
 
   systemctl stop monad-bft monad-execution monad-rpc || true
 
@@ -227,7 +253,9 @@ EOF
   curl -o /home/monad/monad-bft/config/node.toml $MF_BUCKET/config/${NETWORK}/latest/full-node-node.toml
 
   sed -i "s|^KEYSTORE_PASSWORD=$|KEYSTORE_PASSWORD='$(openssl rand -base64 32)'|" /home/monad/.env
+  set +x
   source /home/monad/.env
+  set -x
   mkdir -p /opt/monad/backup/
   echo "Keystore password: ${KEYSTORE_PASSWORD}" >/opt/monad/backup/keystore-password-backup
 
@@ -247,7 +275,9 @@ EOF
   grep "public key" /opt/monad/backup/secp-backup /opt/monad/backup/bls-backup |
     tee /home/monad/pubkey-secp-bls
 
+  set +x
   source /home/monad/.env
+  set -x
   sig_out="$(
     monad-sign-name-record \
       --address "$(curl -s4 ifconfig.me)":8000 \
