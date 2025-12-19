@@ -16,6 +16,12 @@ set -euo pipefail
 # curl -fsSL https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl | bash -s -- up --network mainnet --disk nvme1n1
 #
 
+# Check if running on Ubuntu
+if [[ ! -f /etc/os-release ]] || ! grep -q "^ID=ubuntu" /etc/os-release; then
+  echo "Error: monadctl only runs on Ubuntu" >&2
+  exit 1
+fi
+
 CONFIG_FILE="/home/monad/monad-bft/config/node.toml"
 DEFAULT_NETWORK="mainnet"
 
