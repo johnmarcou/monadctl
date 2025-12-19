@@ -204,6 +204,7 @@ cmd_init() {
 
   systemctl stop monad-bft monad-execution monad-rpc || true
 
+  apt update
   apt upgrade -y || true
   apt install -y curl nvme-cli aria2 jq
   cat <<EOF >/etc/apt/sources.list.d/category-labs.sources
