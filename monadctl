@@ -28,6 +28,7 @@ Usage:
   monadctl status          # show node status
   monadctl stop            # stop monad services
   monadctl up              # spin up a new node
+  monadctl down            # stop monad services
 EOF
 }
 
@@ -51,6 +52,7 @@ main() {
   restart) cmd_restart ;;
   reload) cmd_reload ;;
   edit) cmd_edit ;;
+  down) cmd_down ;;
   up)
     shift
     cmd_up "$@"
@@ -92,6 +94,15 @@ cmd_restart() {
 
 cmd_reload() {
   monad-debug-node -c /home/monad/monad-bft/controlpanel.sock reload-config
+}
+
+cmd_up() {
+  cmd_init "$@"
+  cmd_hard_reset
+}
+
+cmd_down() {
+  cmd_stop
 }
 
 cmd_reset() {
@@ -251,11 +262,6 @@ EOF
 
   chown -R monad:monad /home/monad/
   systemctl enable monad-bft monad-execution monad-rpc
-}
-
-cmd_up() {
-  cmd_init "$@"
-  cmd_hard_reset
 }
 
 main "$@"
