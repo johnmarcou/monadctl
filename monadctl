@@ -9,7 +9,11 @@ set -euo pipefail
 #
 # Run:
 #
-# $ monadctl up
+# $ monadctl
+#
+# Install monad node only:
+#
+# curl -fsSL https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl | bash -s -- up mainnet nvme1n1
 #
 
 CONFIG_FILE="/home/monad/monad-bft/config/node.toml"
