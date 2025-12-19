@@ -1,62 +1,66 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ⚠️ This script is not officially supported
-# Use at your own risk.
+# ⚠️ This script is experimental and not officially supported - Use at your own risk.
 #
 # Install live version:
 #
 # $ install -m 0755 <(curl https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/run-monadctl.sh) /usr/local/bin/monadctl
 #
 
+CONFIG_FILE="/home/monad/monad-bft/config/node.toml"
+DEFAULT_NETWORK="mainnet"
+
 usage() {
   cat <<EOF
 monadctl – minimal control tool
 
 Usage:
-  monadctl status          # show status via remote monad-status script
-  monadctl start           # start monad-bft / monad-execution / monad-rpc
-  monadctl stop            # stop monad-bft / monad-execution / monad-rpc
-  monadctl restart         # restart monad-bft / monad-execution / monad-rpc
-  monadctl reset           # stop, reset workspace, rotate/vacuum logs, restart
-  monadctl flush           # stop, reset workspace, rotate/vacuum logs (no start)
-  monadctl hard-reset      # stop, reset workspace, rotate/vacuum logs, restore snapshot
-  monadctl init            # alias for reset (for now)
+  monadctl config          # print node configuration
+  monadctl edit            # edit node configuration
+  monadctl flush           # clear workspace, database and logs
+  monadctl init            # initialise node configuration
+  monadctl reload          # reload monad configuration
+  monadctl reset           # reset the node
+  monadctl reset --hard    # reset the node and import latest snapshot
+  monadctl restart         # restart monad services
+  monadctl start           # start monad services
+  monadctl status          # show node status
+  monadctl stop            # stop monad services
 EOF
 }
 
 main() {
   case "${1:-}" in
-  status)
-    shift
-    cmd_status "$@"
-    ;;
-  start) cmd_start ;;
-  stop) cmd_stop ;;
-  restart) cmd_restart ;;
-  reset) cmd_reset ;;
-  reload) cmd_reload ;;
-  flush) cmd_flush ;;
-  edit) cmd_edit ;;
-  config) cmd_config ;;
-  hard-reset)
-    shift
-    cmd_hard_reset "$@"
-    ;;
   init)
     shift
     cmd_init "$@"
     ;;
+  status)
+    shift
+    cmd_status "$@"
+    ;;
+  reset)
+    shift
+    cmd_reset "$@"
+    ;;
+  start) cmd_start ;;
+  flush) cmd_flush ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  reload) cmd_reload ;;
+  edit) cmd_edit ;;
+  config) cmd_config ;;
   *) usage ;;
   esac
 }
 
 cmd_config() {
-  cat /home/monad/monad-bft/config/node.toml
+  cat "$CONFIG_FILE"
 }
 
 cmd_edit() {
-  exec vim /home/monad/monad-bft/config/node.toml </dev/tty >/dev/tty 2>&1
+  exec "${EDITOR:-vi}" $CONFIG_FILE </dev/tty >/dev/tty 2>&1
 }
 
 cmd_status() {
@@ -71,10 +75,14 @@ cmd_stop() {
   systemctl stop monad-bft monad-execution monad-rpc
 }
 
+cmd_flush() {
+  cmd_stop
+  bash /opt/monad/scripts/reset-workspace.sh
+  journalctl --rotate && journalctl --vacuum-time=1s
+}
+
 cmd_restart() {
-  systemctl stop monad-bft monad-execution monad-rpc
-  sleep 2
-  systemctl start monad-bft monad-execution monad-rpc
+  cmd_stop && sleep 2 && cmd_start
 }
 
 cmd_reload() {
@@ -82,37 +90,60 @@ cmd_reload() {
 }
 
 cmd_reset() {
-  systemctl stop monad-bft monad-execution monad-rpc
-  bash /opt/monad/scripts/reset-workspace.sh
-  journalctl --rotate && journalctl --vacuum-time=1s
-  sleep 1
-  systemctl start monad-bft monad-execution monad-rpc
+  local hard=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --hard)
+      hard=true
+      shift
+      ;;
+    -*)
+      echo "Unknown option for reset: $1" >&2
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+    esac
+  done
+
+  if $hard; then
+    cmd_hard_reset
+  else
+    cmd_soft_reset
+  fi
 }
 
-cmd_flush() {
-  systemctl stop monad-bft monad-execution monad-rpc
-  bash /opt/monad/scripts/reset-workspace.sh
-  journalctl --rotate && journalctl --vacuum-time=1s
-}
+cmd_soft_reset() {
+  cmd_stop
 
-log() {
-  echo "monadctl: $*"
+  NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' $CONFIG_FILE)
+  MF_BUCKET=https://bucket.monadinfra.com
+  VALIDATORS_FILE=/home/monad/monad-bft/config/validators/validators.toml
+
+  curl -sSL "$MF_BUCKET/scripts/$NETWORK/download-forkpoint.sh" | bash
+  curl "$MF_BUCKET/validators/$NETWORK/validators.toml" -o $VALIDATORS_FILE
+  chown monad:monad $VALIDATORS_FILE
+
+  cmd_start
 }
 
 cmd_hard_reset() {
-  NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' /home/monad/monad-bft/config/node.toml)
-  log "Hard resetting for $NETWORK network, and start monad services"
-  systemctl stop monad-bft monad-execution monad-rpc
-  bash /opt/monad/scripts/reset-workspace.sh
-  journalctl --rotate && journalctl --vacuum-time=1s
+  cmd_stop
+
+  NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' $CONFIG_FILE)
   MF_BUCKET="https://bucket.monadinfra.com"
+
+  bash /opt/monad/scripts/reset-workspace.sh
   curl -fsSL "${MF_BUCKET}/scripts/${NETWORK}/restore-from-snapshot.sh" | bash
-  systemctl start monad-bft monad-execution monad-rpc
+
+  cmd_start
 }
 
 cmd_init() {
   set -x
-  NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' /home/monad/monad-bft/config/node.toml)
+  NETWORK=${1:-$DEFAULT_NETWORK}
   DISK=${2:-nvme1n1}
 
   systemctl stop monad-bft monad-execution monad-rpc || true
