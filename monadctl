@@ -11,7 +11,7 @@ set -euo pipefail
 #
 # $ monadctl
 #
-# Install monad node only:
+# Install a mainnet Monad node:
 #
 # curl -fsSL https://raw.githubusercontent.com/johnmarcou/monadctl/refs/heads/main/monadctl | bash -s -- up --network mainnet --disk nvme1n1
 #
@@ -27,7 +27,7 @@ DEFAULT_NETWORK="mainnet"
 
 usage() {
   cat <<EOF
-monadctl – minimal control tool
+monadctl – command-line tool to manage a Monad node
 
 Usage:
   monadctl config          # print node configuration

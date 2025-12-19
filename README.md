@@ -1,6 +1,6 @@
 # monadctl
 
-Minimal control tool for managing Monad blockchain nodes.
+Command-line tool to manage a Monad node
 
 ## Installation
 
@@ -12,12 +12,13 @@ install -m 0755 <(curl https://raw.githubusercontent.com/johnmarcou/monadctl/ref
 
 ```bash
 # Spin up a new node
-monadctl up [network] [disk]
+monadctl up --network mainnet --disk nvme1n1
 
 # Stop the node
 monadctl down
 
 # Service management
+monadctl init           # Initialize node configuration
 monadctl start          # Start services
 monadctl stop           # Stop services
 monadctl restart        # Restart services
@@ -34,7 +35,7 @@ monadctl reload         # Reload configuration
 
 # Monitoring
 monadctl status         # Show node status
-monadctl init           # Initialize node configuration
+monadctl status --watch # Follow node status
 ```
 
 ## Default Configuration
