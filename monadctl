@@ -27,6 +27,7 @@ Usage:
   monadctl start           # start monad services
   monadctl status          # show node status
   monadctl stop            # stop monad services
+  monadctl up              # spin up a new node
 EOF
 }
 
@@ -50,6 +51,10 @@ main() {
   restart) cmd_restart ;;
   reload) cmd_reload ;;
   edit) cmd_edit ;;
+  up)
+    shift
+    cmd_up "$@"
+    ;;
   config) cmd_config ;;
   *) usage ;;
   esac
@@ -246,7 +251,11 @@ EOF
 
   chown -R monad:monad /home/monad/
   systemctl enable monad-bft monad-execution monad-rpc
+}
 
+cmd_up() {
+  cmd_init "$@"
+  cmd_hard_reset
 }
 
 main "$@"
