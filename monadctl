@@ -204,9 +204,6 @@ cmd_init() {
 
   systemctl stop monad-bft monad-execution monad-rpc || true
 
-  apt update
-  apt upgrade -y || true
-  apt install -y curl nvme-cli aria2 jq
   cat <<EOF >/etc/apt/sources.list.d/category-labs.sources
 Types: deb
 URIs: https://pkg.category.xyz/
@@ -218,7 +215,10 @@ EOF
   curl -fsSL https://pkg.category.xyz/keys/public-key.asc |
     gpg --dearmor --yes -o /etc/apt/keyrings/category-labs.gpg
 
-  apt update && apt install -y monad
+  apt update
+  apt install -y curl nvme-cli aria2 jq
+  apt install -y monad
+
   useradd -m -s /bin/bash monad || true
   mkdir -p /home/monad/monad-bft/config \
     /home/monad/monad-bft/ledger \
