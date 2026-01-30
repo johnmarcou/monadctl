@@ -246,6 +246,7 @@ EOF
 
   ufw allow ssh
   ufw allow 8000
+  ufw allow 8001
   ufw --force enable
 
   OTEL_VERSION="0.139.0"
@@ -288,6 +289,7 @@ EOF
   sig_out="$(
     monad-sign-name-record \
       --address "$(curl -s4 ifconfig.me)":8000 \
+      --authenticated-udp-port 8001 \
       --keystore-path /home/monad/monad-bft/config/id-secp \
       --password "${KEYSTORE_PASSWORD}" \
       --self-record-seq-num 0
