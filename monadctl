@@ -292,7 +292,7 @@ EOF
       --authenticated-udp-port 8001 \
       --keystore-path /home/monad/monad-bft/config/id-secp \
       --password "${KEYSTORE_PASSWORD}" \
-      --self-record-seq-num 1
+      --self-record-seq-num 2
   )"
 
   node_name_val="$(hostname)"
