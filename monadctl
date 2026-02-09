@@ -178,6 +178,7 @@ cmd_hard_reset() {
 cmd_init() {
   NETWORK=$DEFAULT_NETWORK
   DISK="nvme1n1"
+  VERSION=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -187,6 +188,10 @@ cmd_init() {
       ;;
     --disk)
       DISK="$2"
+      shift 2
+      ;;
+    --version)
+      VERSION="$2"
       shift 2
       ;;
     -*)
@@ -218,6 +223,13 @@ EOF
   apt update
   apt install -y curl nvme-cli aria2 jq
   apt install -y monad
+
+  if [[ -n "$VERSION" ]]; then
+    monad_package="monad=${VERSION}"
+  else
+    monad_package="monad"
+  fi
+  apt install -y --allow-downgrades "$monad_package"
 
   useradd -m -s /bin/bash monad || true
   mkdir -p /home/monad/monad-bft/config \
