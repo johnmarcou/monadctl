@@ -179,6 +179,7 @@ cmd_hard_reset() {
 cmd_init() {
   NETWORK=$DEFAULT_NETWORK
   DISK="nvme1n1"
+  SEQ_NUM="0"
   VERSION=""
 
   while [[ $# -gt 0 ]]; do
@@ -193,6 +194,10 @@ cmd_init() {
       ;;
     --version)
       VERSION="$2"
+      shift 2
+      ;;
+    --seq-num)
+      SEQ_NUM="$2"
       shift 2
       ;;
     -*)
@@ -303,7 +308,7 @@ EOF
       --authenticated-udp-port 8001 \
       --keystore-path /home/monad/monad-bft/config/id-secp \
       --password "${KEYSTORE_PASSWORD}" \
-      --self-record-seq-num 2
+      --self-record-seq-num "${SEQ_NUM}"
   )"
 
   node_name_val="$(hostname)"
