@@ -24,6 +24,7 @@ fi
 
 CONFIG_FILE="/home/monad/monad-bft/config/node.toml"
 DEFAULT_NETWORK="mainnet"
+DOC_URL="https://docs.monad.xyz/networks.json"
 
 usage() {
   cat <<EOF
@@ -224,12 +225,10 @@ EOF
   apt install -y curl nvme-cli aria2 jq
   apt install -y monad
 
-  if [[ -n "$VERSION" ]]; then
-    monad_package="monad=${VERSION}"
-  else
-    monad_package="monad"
+  if [[ "$VERSION" == '' ]]; then
+    VERSION=$(curl -fsSL "$DOC_URL" | jq -r --arg network "$NETWORK" '.[$network].monad_version')
   fi
-  apt install -y --allow-downgrades "$monad_package"
+  apt install -y --allow-downgrades monad="$VERSION"
 
   useradd -m -s /bin/bash monad || true
   mkdir -p /home/monad/monad-bft/config \
