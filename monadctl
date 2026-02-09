@@ -221,14 +221,14 @@ EOF
   curl -fsSL https://pkg.category.xyz/keys/public-key.asc |
     gpg --dearmor --yes -o /etc/apt/keyrings/category-labs.gpg
 
-  apt update
-  apt install -y curl nvme-cli aria2 jq
-  apt install -y monad
+  apt update -qq
+  apt install -y -qq curl nvme-cli aria2 jq
 
   if [[ "$VERSION" == '' ]]; then
     VERSION=$(curl -fsSL "$DOC_URL" | jq -r --arg network "$NETWORK" '.[$network].monad_version')
   fi
-  apt install -y --allow-downgrades monad="$VERSION"
+
+  apt install -y -qq --allow-downgrades monad="$VERSION"
 
   useradd -m -s /bin/bash monad || true
   mkdir -p /home/monad/monad-bft/config \
