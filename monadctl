@@ -181,6 +181,7 @@ cmd_init() {
   DISK="nvme1n1"
   SEQ_NUM="0"
   VERSION=""
+  LOOPBACK_DISK=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -190,6 +191,10 @@ cmd_init() {
       ;;
     --disk)
       DISK="$2"
+      shift 2
+      ;;
+    --loopback-disk)
+      LOOPBACK_DISK="$2"
       shift 2
       ;;
     --version)
@@ -212,6 +217,16 @@ cmd_init() {
   done
 
   set -x
+
+  # Prepare loopback device
+  if [[ -n "$LOOPBACK_DISK" ]]; then
+    fallocate -l 100G "$LOOPBACK_DISK" || dd if=/dev/zero of="$LOOPBACK_DISK" bs=1M count=20480
+    LOOP_DEVICE=$(losetup -j "$LOOPBACK_DISK" | cut -d: -f1)
+    if [[ -z "$LOOP_DEVICE" ]]; then
+      LOOP_DEVICE=$(losetup -fP --show "$LOOPBACK_DISK")
+    fi
+    DISK="$(echo $LOOP_DEVICE | cut -d '/' -f3)"
+  fi
 
   systemctl stop monad-bft monad-execution monad-rpc || true
 
