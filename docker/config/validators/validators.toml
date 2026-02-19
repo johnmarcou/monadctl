@@ -1,0 +1,7 @@
+[[validator_sets]]
+epoch = 1
+
+[[validator_sets.validators]]
+node_id = "0x<SECP_PUBKEY>"
+stake = 1
+cert_pubkey = "0x<BLS_PUBKEY>"

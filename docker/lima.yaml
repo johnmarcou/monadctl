@@ -1,0 +1,27 @@
+vmType: qemu
+arch: x86_64
+cpuType:
+  x86_64: "EPYC-Genoa,pdpe1gb"
+
+cpus: 16
+memory: 16GiB
+disk: 200GiB
+
+images:
+  - location: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+    arch: "x86_64"
+# mounts:
+#   - location: "~"
+#     writable: true
+# ssh:
+#   localPort: 9022
+#   loadDotSSHPubKeys: true
+
+# portForwards:
+# - guestSocket: "/run/user/{{.UID}}/docker.sock"
+#   hostSocket: "{{.Dir}}/sock/docker.sock"
+
+# plain: true
+# guestInstallPrefix: null
+# user:
+#   name: lima
