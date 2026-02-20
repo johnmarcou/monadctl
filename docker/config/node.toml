@@ -15,8 +15,8 @@ chain_id = 20143
 #########################################################
 # Node-specific configuration
 #########################################################
-[bootstrap]
-peers = []
+# [bootstrap]
+# peers = []
 # [[bootstrap.peers]]
 # address = "x.x.x.x:xxxx"
 # record_seq_num = 0
@@ -53,8 +53,8 @@ init_peers = []
 # secp256k1_pubkey = "..."
 
 [fullnode_raptorcast]
-enable_publisher = false
-enable_client = false
+enable_publisher = true
+enable_client = true
 raptor10_fullnode_redundancy_factor = 3.0
 max_group_size = 10
 round_span = 240
