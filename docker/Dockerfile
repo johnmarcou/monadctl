@@ -19,3 +19,4 @@ RUN apt-get update && apt-get install -y monad=${MONAD_VERSION}
 ENTRYPOINT ["/entrypoint.sh"]
 COPY entrypoint.sh /entrypoint.sh
 COPY config/ /home/monad/monad-bft/config/
+COPY scripts/* /usr/local/bin/.

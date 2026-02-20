@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -eq 0 ]]; then
+  echo "Usage: log \"your message\"" >&2
+  exit 1
+fi
+
+msg="$*"
+ts=$(date +"%Y-%m-%d %H:%M:%S")
+
+printf "\n"
+printf "\033[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n"
+printf "\033[1;32m[%s]\033[0m \033[1m%s\033[0m\n" "$ts" "$msg"
+printf "\033[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n"
