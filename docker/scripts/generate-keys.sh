@@ -9,7 +9,7 @@ SHARED_PATH="/shared"
 PEER_FILE="${SHARED_PATH}/${VALIDATOR_NAME}.peer"
 
 [[ -f "$PEER_FILE" ]] && {
-  echo "Already existing peer file: $PEER_FILE" >&2
+  echo "Already existing peer file: $PEER_FILE, skip" >&2
   exit 0
 }
 

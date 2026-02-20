@@ -6,6 +6,11 @@ SHARED_PATH="/shared"
 VAL_ID=${VAL_ID:-1}
 VALIDATOR_NAME="validator-$VAL_ID"
 
+[[ -f "/home/monad/monad-bft/config/validators/validators.toml" ]] && {
+  echo "Already existing configuration: skip" >&2
+  exit 0
+}
+
 log "Waiting for all peers info..."
 while true; do
   ready_count="$(find "$SHARED_PATH/" -maxdepth 1 -type f -name '*.peer' | wc -l | tr -d ' ')"
