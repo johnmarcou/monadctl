@@ -5,8 +5,8 @@ set -e
 VAL_ID=${VAL_ID:-1}
 VALIDATOR_NAME="validator-$VAL_ID"
 CONTAINER_IP_ADDRESS="$(hostname -i)"
-SHARED_PATH="/shared"
-PEER_FILE="${SHARED_PATH}/${VALIDATOR_NAME}.peer"
+PEERS_PATH="/shared/peers/"
+PEER_FILE="${PEERS_PATH}/${VALIDATOR_NAME}.peer"
 
 [[ -f "$PEER_FILE" ]] && {
   echo "Already existing peer file: $PEER_FILE, skip" >&2
@@ -66,6 +66,6 @@ jq -n \
     self_name_record_sig: $sig
   }' >"$TMP_PEER_FILE"
 
-mkdir -p "$SHARED_PATH"
+mkdir -p "$PEERS_PATH"
 cp "$TMP_PEER_FILE" "$PEER_FILE"
 cat "$PEER_FILE"

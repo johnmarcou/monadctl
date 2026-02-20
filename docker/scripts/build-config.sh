@@ -2,9 +2,9 @@
 
 set -e
 
-SHARED_PATH="/shared"
 VAL_ID=${VAL_ID:-1}
 VALIDATOR_NAME="validator-$VAL_ID"
+PEERS_PATH="/shared/peers/"
 
 [[ -f "/home/monad/monad-bft/config/validators/validators.toml" ]] && {
   echo "Already existing configuration: skip" >&2
@@ -13,7 +13,7 @@ VALIDATOR_NAME="validator-$VAL_ID"
 
 log "Waiting for all peers info..."
 while true; do
-  ready_count="$(find "$SHARED_PATH/" -maxdepth 1 -type f -name '*.peer' | wc -l | tr -d ' ')"
+  ready_count="$(find "$PEERS_PATH/" -maxdepth 1 -type f -name '*.peer' | wc -l | tr -d ' ')"
   if [[ "$ready_count" -ge "$TOTAL_VALIDATOR_NUMBER" ]]; then
     break
   fi
@@ -22,7 +22,7 @@ while true; do
 done
 
 log "Building node.toml configuration"
-for f in /shared/*.peer; do
+for f in "$PEERS_PATH"*.peer; do
   [[ -f "$f" ]] || continue
 
   PEER_VALIDATOR_NAME=$(jq -r '.validator_name' "$f")
@@ -61,7 +61,7 @@ cat >/home/monad/monad-bft/config/validators/validators.toml <<'EOF'
 epoch = 1
 EOF
 
-for f in /shared/*.peer; do
+for f in "$PEERS_PATH"/*.peer; do
   [[ -f "$f" ]] || continue
   SECP_PUBKEY=$(jq -r '.secp256k1.public_key' "$f")
   BLS_PUBKEY=$(jq -r '.bls.public_key' "$f")
