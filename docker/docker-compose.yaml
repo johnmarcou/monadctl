@@ -22,7 +22,7 @@ services:
       - 8081:8080
     environment:
       VAL_ID: 1
-      TOTAL_VALIDATOR_NUMBER: 2
+      TOTAL_VALIDATOR_NUMBER: 4
     volumes:
       - shared-data:/shared
 
@@ -37,36 +37,36 @@ services:
       - 8082:8080
     environment:
       VAL_ID: 2
-      TOTAL_VALIDATOR_NUMBER: 2
+      TOTAL_VALIDATOR_NUMBER: 4
     volumes:
       - shared-data:/shared
 
-  # validator-3:
-  #   container_name: validator-3
-  #   networks:
-  #     solonet:
-  #       ipv4_address: 172.21.0.13
-  #   build: .
-  #   privileged: true
-  #   ports:
-  #     - 8083:8080
-  #   environment:
-  #     VAL_ID: 3
-  #     TOTAL_VALIDATOR_NUMBER: 4
-  #   volumes:
-  #     - shared-data:/shared
+  validator-3:
+    container_name: validator-3
+    networks:
+      solonet:
+        ipv4_address: 172.21.0.13
+    build: .
+    privileged: true
+    ports:
+      - 8083:8080
+    environment:
+      VAL_ID: 3
+      TOTAL_VALIDATOR_NUMBER: 4
+    volumes:
+      - shared-data:/shared
 
-  # validator-4:
-  #   container_name: validator-4
-  #   networks:
-  #     solonet:
-  #       ipv4_address: 172.21.0.14
-  #   build: .
-  #   privileged: true
-  #   ports:
-  #     - 8084:8080
-  #   environment:
-  #     VAL_ID: 4
-  #     TOTAL_VALIDATOR_NUMBER: 4
-  #   volumes:
-  #     - shared-data:/shared
+  validator-4:
+    container_name: validator-4
+    networks:
+      solonet:
+        ipv4_address: 172.21.0.14
+    build: .
+    privileged: true
+    ports:
+      - 8084:8080
+    environment:
+      VAL_ID: 4
+      TOTAL_VALIDATOR_NUMBER: 4
+    volumes:
+      - shared-data:/shared

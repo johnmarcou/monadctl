@@ -10,7 +10,19 @@ Signed-By: /etc/apt/keyrings/category-labs.gpg" \
 > /etc/apt/sources.list.d/category-labs.sources
 
 RUN apt-get update \
-  && apt-get install -y -qq curl gnupg nvme-cli aria2 jq ca-certificates parted cpulimit vim \
+  && apt-get install -y -qq \
+    aria2 \
+    ca-certificates \
+    cpulimit \
+    curl \
+    git \
+    gnupg \
+    jq \
+    nvme-cli \
+    parted \
+    pipx \
+    python3 \
+    vim \
   && curl -fsSL https://pkg.category.xyz/keys/public-key.asc \
    | gpg --dearmor --yes -o /etc/apt/keyrings/category-labs.gpg
 
@@ -22,9 +34,22 @@ RUN  OTEL_VERSION="0.139.0" \
   && dpkg -i /tmp/otelcol_linux_amd64.deb \
   && cp /opt/monad/scripts/otel-config.yaml /etc/otelcol/config.yaml
 
+WORKDIR /root/
+RUN git clone https://github.com/monad-developers/staking-sdk-cli.git \
+  && cd staking-sdk-cli \
+  && python3 -m venv cli-venv \
+  && . cli-venv/bin/activate \
+  && pip install . \
+  && printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  '/root/staking-sdk-cli/cli-venv/bin/python /root/staking-sdk-cli/staking-cli/main.py "$@"' \
+  > /usr/local/bin/staking-cli \
+  && chmod +x /usr/local/bin/staking-cli
+
+RUN curl -L https://foundry.paradigm.xyz | bash  && . ~/.bashrc && foundryup
+ENV ETH_RPC_URL="http://localhost:8080"
 
 ENTRYPOINT ["/entrypoint.sh"]
 COPY entrypoint.sh /entrypoint.sh
 COPY config/ /home/monad/monad-bft/config/
 COPY scripts/* /usr/local/bin/.
-

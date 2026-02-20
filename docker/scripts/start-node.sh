@@ -31,7 +31,8 @@ while true; do
 done &
 
 log "Start OTEL"
-/usr/bin/otelcol --config=/etc/otelcol/config.yaml &
+/usr/bin/otelcol --config=/etc/otelcol/config.yaml \
+  >/var/log/monad-otel.log 2>&1 &
 
 log "Start RPC"
 cpulimit -l 50 -- monad-rpc \
@@ -68,12 +69,5 @@ exec monad-node \
   --otel-endpoint "http://0.0.0.0:4317" \
   --record-metrics-interval-seconds 1 \
   --validators-path /home/monad/monad-bft/config/validators/validators.toml \
-  --keystore-password password
-# >/var/log/monad-bft.log 2>&1 &
-
-# log "Start ledger tail"
-# ln -s /home/monad/monad-bft monad
-# while true; do
-#   /usr/local/bin/monad-ledger-tail | jq -C -c . || true
-#   sleep 1
-# done
+  --keystore-password password \
+  >/var/log/monad-bft.log 2>&1 &
