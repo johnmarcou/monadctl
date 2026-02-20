@@ -10,25 +10,25 @@ losetup "$DEVICE" /loopfile.img
 ln -s "$DEVICE" /dev/triedb || true
 monad-mpt --create --storage /dev/triedb
 
-# if [[ -f /shared/forkpoint.toml ]]; then
-#   log "Network already started, fetching forkpoint"
-#   cp /shared/forkpoint.toml /home/monad/monad-bft/config/forkpoint/forkpoint.toml
-#   cp /shared/validators.toml /home/monad/monad-bft/config/validators/validators.toml
-# fi
-#
-# log "Start loop to copy forkpoint and validators to shared folder"
-# while true; do
-#   cp /home/monad/monad-bft/config/forkpoint/forkpoint.toml /shared/forkpoint.toml
-#   cp /home/monad/monad-bft/config/validators/validators.toml /shared/validators.toml
-#   sleep 1
-# done &
+if [[ -f /shared/forkpoint.toml ]]; then
+  log "Network already started, fetching forkpoint"
+  cp /shared/forkpoint.toml /home/monad/monad-bft/config/forkpoint/forkpoint.toml
+  cp /shared/validators.toml /home/monad/monad-bft/config/validators/validators.toml
+else
+  log "Create Genesis block"
+  monad --chain monad_devnet \
+    --db /dev/triedb \
+    --block_db ./monad-bft/ledger \
+    --nblocks 0 \
+    --log_level INFO
+fi
 
-log "Create Genesis block"
-monad --chain monad_devnet \
-  --db /dev/triedb \
-  --block_db ./monad-bft/ledger \
-  --nblocks 0 \
-  --log_level INFO
+log "Start loop to copy forkpoint and validators to shared folder"
+while true; do
+  cp /home/monad/monad-bft/config/forkpoint/forkpoint.toml /shared/forkpoint.toml
+  cp /home/monad/monad-bft/config/validators/validators.toml /shared/validators.toml
+  sleep 1
+done &
 
 log "Start OTEL"
 /usr/bin/otelcol --config=/etc/otelcol/config.yaml &

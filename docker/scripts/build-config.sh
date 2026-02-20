@@ -6,7 +6,7 @@ VAL_ID=${VAL_ID:-1}
 VALIDATOR_NAME="validator-$VAL_ID"
 PEERS_PATH="/shared/peers/"
 
-[[ -f "/home/monad/monad-bft/config/validators/validators.toml" ]] && {
+[[ -f "/home/monad/monad-bft/config/validators.toml" ]] && {
   echo "Already existing configuration: skip" >&2
   exit 0
 }
@@ -20,6 +20,10 @@ while true; do
   echo "Waiting, have ${ready_count}/${TOTAL_VALIDATOR_NUMBER} ready..."
   sleep 1
 done
+
+log "Get keys from shared volume"
+cp "/shared/keys/$VAL_ID/id-secp" /home/monad/monad-bft/config/id-secp
+cp "/shared/keys/$VAL_ID/id-bls" /home/monad/monad-bft/config/id-bls
 
 log "Building node.toml configuration"
 for f in "$PEERS_PATH"*.peer; do

@@ -5,23 +5,24 @@ set -e
 VAL_ID=${VAL_ID:-1}
 VALIDATOR_NAME="validator-$VAL_ID"
 CONTAINER_IP_ADDRESS="$(hostname -i)"
+KEYS_PATH="/shared/keys/"
 PEERS_PATH="/shared/peers/"
 PEER_FILE="${PEERS_PATH}/${VALIDATOR_NAME}.peer"
 
+log "Generate keys"
 [[ -f "$PEER_FILE" ]] && {
   echo "Already existing peer file: $PEER_FILE, skip" >&2
   exit 0
 }
-
-log "Generate keys"
+mkdir -p "$KEYS_PATH/$VAL_ID"
 monad-keystore create \
   --key-type secp \
-  --keystore-path /home/monad/monad-bft/config/id-secp \
+  --keystore-path "/shared/keys/$VAL_ID/id-secp" \
   --password password >/opt/monad/backup/secp-backup
 
 monad-keystore create \
   --key-type bls \
-  --keystore-path /home/monad/monad-bft/config/id-bls \
+  --keystore-path "/shared/keys/$VAL_ID/id-bls" \
   --password password >/opt/monad/backup/bls-backup
 
 log "Generate node record signature"
@@ -29,7 +30,7 @@ sig_out=$(
   monad-sign-name-record \
     --address "$CONTAINER_IP_ADDRESS:8000" \
     --authenticated-udp-port 8001 \
-    --keystore-path /home/monad/monad-bft/config/id-secp \
+    --keystore-path "/shared/keys/$VAL_ID/id-secp" \
     --password password \
     --self-record-seq-num 0
 )

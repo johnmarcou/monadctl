@@ -10,7 +10,7 @@ Signed-By: /etc/apt/keyrings/category-labs.gpg" \
 > /etc/apt/sources.list.d/category-labs.sources
 
 RUN apt-get update \
-  && apt-get install -y -qq curl gnupg nvme-cli aria2 jq ca-certificates parted cpulimit \
+  && apt-get install -y -qq curl gnupg nvme-cli aria2 jq ca-certificates parted cpulimit vim \
   && curl -fsSL https://pkg.category.xyz/keys/public-key.asc \
    | gpg --dearmor --yes -o /etc/apt/keyrings/category-labs.gpg
 
