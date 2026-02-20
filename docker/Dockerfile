@@ -16,7 +16,15 @@ RUN apt-get update \
 
 RUN apt-get update && apt-get install -y monad=${MONAD_VERSION}
 
+RUN  OTEL_VERSION="0.139.0" \
+  && OTEL_PACKAGE="https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTEL_VERSION}/otelcol_${OTEL_VERSION}_linux_amd64.deb" \
+  && curl -fsSL "$OTEL_PACKAGE" -o /tmp/otelcol_linux_amd64.deb \
+  && dpkg -i /tmp/otelcol_linux_amd64.deb \
+  && cp /opt/monad/scripts/otel-config.yaml /etc/otelcol/config.yaml
+
+
 ENTRYPOINT ["/entrypoint.sh"]
 COPY entrypoint.sh /entrypoint.sh
 COPY config/ /home/monad/monad-bft/config/
 COPY scripts/* /usr/local/bin/.
+

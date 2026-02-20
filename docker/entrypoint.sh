@@ -4,4 +4,4 @@ set -e
 
 generate-keys.sh
 build-config.sh
-start-node.sh
+exec start-node.sh
