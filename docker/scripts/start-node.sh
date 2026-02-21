@@ -2,6 +2,8 @@
 
 set -e
 
+VAL_ID=${VAL_ID:-1}
+
 log "Prepare triedb device"
 fallocate -l 100G /loopfile.img
 DEVICE="/dev/loop$VAL_ID"
@@ -71,3 +73,9 @@ exec monad-node \
   --validators-path /home/monad/monad-bft/config/validators/validators.toml \
   --keystore-password password \
   >/var/log/monad-bft.log 2>&1 &
+
+log "Waiting for blockchain and RPC to be online"
+until (echo >/dev/tcp/127.0.0.1/8080) >/dev/null 2>&1; do
+  sleep 1
+done
+sleep 3

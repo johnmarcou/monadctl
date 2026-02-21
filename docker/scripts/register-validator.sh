@@ -13,12 +13,6 @@ if [[ "${VAL_ID:-1}" != "1" ]]; then
   exit 0
 fi
 
-log "Waiting for blockchain and RPC to be online"
-until (echo >/dev/tcp/127.0.0.1/8080) >/dev/null 2>&1; do
-  sleep 1
-done
-sleep 3
-
 pushd /home/monad/monad-bft/config/staking/ >/dev/null
 
 for PEER_FILE in "$PEERS_PATH"/*.peer; do

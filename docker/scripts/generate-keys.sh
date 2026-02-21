@@ -4,7 +4,7 @@ set -e
 
 VAL_ID=${VAL_ID:-1}
 VALIDATOR_NAME="validator-$VAL_ID"
-CONTAINER_IP_ADDRESS="$(hostname -i)"
+CONTAINER_IP_ADDRESS=$(hostname -i 2>/dev/null | awk '{ if (NF==1) print $1; else print "0.0.0.0" }')
 KEYS_PATH="/shared/keys/"
 PEERS_PATH="/shared/peers/"
 PEER_FILE="${PEERS_PATH}/${VALIDATOR_NAME}.peer"
@@ -14,6 +14,7 @@ log "Generate keys"
   echo "Already existing peer file: $PEER_FILE, skip" >&2
   exit 0
 }
+
 mkdir -p "$KEYS_PATH/$VAL_ID"
 monad-keystore create \
   --key-type secp \

@@ -25,6 +25,10 @@ services:
       TOTAL_VALIDATOR_NUMBER: 4
     volumes:
       - shared-data:/shared
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
 
   validator-2:
     container_name: validator-2
@@ -40,6 +44,10 @@ services:
       TOTAL_VALIDATOR_NUMBER: 4
     volumes:
       - shared-data:/shared
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
 
   validator-3:
     container_name: validator-3
@@ -55,6 +63,10 @@ services:
       TOTAL_VALIDATOR_NUMBER: 4
     volumes:
       - shared-data:/shared
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
 
   validator-4:
     container_name: validator-4
@@ -70,3 +82,7 @@ services:
       TOTAL_VALIDATOR_NUMBER: 4
     volumes:
       - shared-data:/shared
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
