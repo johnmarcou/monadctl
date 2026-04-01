@@ -250,6 +250,8 @@ EOF
 
   apt install -y -qq --allow-downgrades monad="$VERSION"
 
+  apt-mark hold monad
+
   useradd -m -s /bin/bash monad || true
   mkdir -p /home/monad/monad-bft/config \
     /home/monad/monad-bft/ledger \
