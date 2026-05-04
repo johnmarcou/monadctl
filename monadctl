@@ -248,7 +248,7 @@ EOF
     VERSION=$(curl -fsSL "$DOC_URL" | jq -r --arg network "$NETWORK" '.[$network].monad_version')
   fi
 
-  apt install -y -qq --allow-downgrades monad="$VERSION"
+  apt install -y -qq --allow-downgrades --allow-change-held-packages monad="$VERSION"
 
   apt-mark hold monad
 
