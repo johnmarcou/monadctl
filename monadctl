@@ -283,11 +283,20 @@ EOF
   ufw --force enable
 
   OTEL_VERSION="0.139.0"
+  OTEL_CHECKSUM="1a1576dde7d51fa7094f4963ceaff37c91ac7b9c9593ba735a3a328ec6f8acd9"
   OTEL_PACKAGE="https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTEL_VERSION}/otelcol_${OTEL_VERSION}_linux_amd64.deb"
-  curl -fsSL "$OTEL_PACKAGE" -o /tmp/otelcol_linux_amd64.deb
-  dpkg -i /tmp/otelcol_linux_amd64.deb
-  cp /opt/monad/scripts/otel-config.yaml /etc/otelcol/config.yaml
-  systemctl restart otelcol
+  OTEL_DEB="/tmp/otelcol_linux_amd64.deb"
+
+  curl -fsSL "$OTEL_PACKAGE" -o "$OTEL_DEB"
+
+  if echo "${OTEL_CHECKSUM}  ${OTEL_DEB}" | sha256sum --check --quiet; then
+    dpkg -i "$OTEL_DEB"
+    cp /opt/monad/scripts/otel-config.yaml /etc/otelcol/config.yaml
+    systemctl restart otelcol
+  else
+    echo "Checksum verification failed — aborting install." >&2
+    exit 1
+  fi
 
   MF_BUCKET=https://bucket.monadinfra.com
   curl -o /home/monad/.env $MF_BUCKET/config/${NETWORK}/latest/.env.example
