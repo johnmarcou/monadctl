@@ -328,9 +328,16 @@ EOF
   set +x
   source /home/monad/.env
   set -x
+  NODE_IP="$(curl -s4 ifconfig.me)"
+  if dpkg --compare-versions "$VERSION" le "0.15.1"; then
+    ADDRESS_FLAGS=(--address "${NODE_IP}:8000")
+  else
+    ADDRESS_FLAGS=(--ip "$NODE_IP" --tcp-port 8000 --udp-port 8000)
+  fi
+
   sig_out="$(
     monad-sign-name-record \
-      --address "$(curl -s4 ifconfig.me)":8000 \
+      "${ADDRESS_FLAGS[@]}" \
       --authenticated-udp-port 8001 \
       --keystore-path /home/monad/monad-bft/config/id-secp \
       --password "${KEYSTORE_PASSWORD}" \
