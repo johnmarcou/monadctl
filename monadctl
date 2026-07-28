@@ -346,7 +346,7 @@ EOF
 
   node_name_val="$(hostname)"
   self_address=$(printf '%s\n' "$sig_out" | grep '^self_address' | cut -d'"' -f2)
-  self_tcp_port=$(printf '%s\n' "$sig_out" | grep '^self_tcp_port' | awk '{print $3}')
+  self_tcp_port=$(printf '%s\n' "$sig_out" | grep '^self_tcp_port' | awk '{print $3}' || true)
   if [[ -n "$self_tcp_port" && "$self_address" != *:* ]]; then
     self_address="${self_address}:${self_tcp_port}"
   fi
