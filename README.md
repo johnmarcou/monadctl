@@ -14,6 +14,12 @@ install -m 0755 <(curl https://raw.githubusercontent.com/johnmarcou/monadctl/ref
 # Spin up a new node
 monadctl up --network mainnet --disk nvme1n1
 
+# Spin up a node pinned to a specific published monad apt version
+monadctl up --network mainnet --disk nvme1n1 --version 0.15.2
+
+# Spin up a node from a local monad .deb package
+monadctl up --network mainnet --disk nvme1n1 --deb /path/to/monad.deb
+
 # Stop the node
 monadctl down
 

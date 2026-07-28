@@ -47,6 +47,16 @@ Usage:
 
 Examples:
   monadctl up --network mainnet --disk nvme1n1
+  monadctl up --network mainnet --disk nvme1n1 --version 0.15.2
+  monadctl up --network mainnet --disk nvme1n1 --deb /path/to/monad.deb
+
+Init/up options:
+  --network <name>       # network to join (default: mainnet)
+  --disk <device>         # data disk device name, e.g. nvme1n1 (default: nvme1n1)
+  --loopback-disk <path>  # use a loopback file as the data disk instead of --disk
+  --version <version>     # pin the monad package to a specific published apt version
+  --deb <path>            # install the monad package from a local .deb file instead of apt
+  --seq-num <n>           # self-record sequence number (default: 0)
 
 EOF
 }
@@ -181,6 +191,7 @@ cmd_init() {
   DISK="nvme1n1"
   SEQ_NUM="0"
   VERSION=""
+  DEB=""
   LOOPBACK_DISK=""
 
   while [[ $# -gt 0 ]]; do
@@ -201,6 +212,10 @@ cmd_init() {
       VERSION="$2"
       shift 2
       ;;
+    --deb)
+      DEB="$2"
+      shift 2
+      ;;
     --seq-num)
       SEQ_NUM="$2"
       shift 2
@@ -215,6 +230,19 @@ cmd_init() {
       ;;
     esac
   done
+
+  if [[ -n "$DEB" && -n "$VERSION" ]]; then
+    echo "Error: --deb and --version are mutually exclusive" >&2
+    exit 1
+  fi
+
+  if [[ -n "$DEB" ]]; then
+    if [[ ! -f "$DEB" ]]; then
+      echo "Error: --deb file not found: $DEB" >&2
+      exit 1
+    fi
+    DEB="$(readlink -f "$DEB")"
+  fi
 
   set -x
 
@@ -244,13 +272,18 @@ EOF
   apt update -qq
   apt install -y -qq curl nvme-cli aria2 jq
 
-  if [[ "$VERSION" == '' ]]; then
-    VERSION=$(curl -fsSL "$DOC_URL" | jq -r --arg network "$NETWORK" '.[$network].monad_version')
+  if [[ -n "$DEB" ]]; then
+    apt install -y -qq --allow-downgrades --allow-change-held-packages "$DEB"
+  else
+    if [[ "$VERSION" == '' ]]; then
+      VERSION=$(curl -fsSL "$DOC_URL" | jq -r --arg network "$NETWORK" '.[$network].monad_version')
+    fi
+    apt install -y -qq --allow-downgrades --allow-change-held-packages monad="$VERSION"
   fi
 
-  apt install -y -qq --allow-downgrades --allow-change-held-packages monad="$VERSION"
-
   apt-mark hold monad
+
+  VERSION=$(dpkg-query -W -f='${Version}' monad)
 
   useradd -m -s /bin/bash monad || true
   mkdir -p /home/monad/monad-bft/config \
