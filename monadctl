@@ -160,6 +160,10 @@ cmd_logs() {
   $execution && units+=("monad-execution")
   $rpc && units+=("monad-rpc")
 
+  # kill the backgrounded journalctl/jq/sed pipelines below on exit so they
+  # don't get orphaned if monadctl itself is killed/terminated
+  trap 'kill $(jobs -p) 2>/dev/null' EXIT INT TERM
+
   local purple=$'\033[0;35m' blue=$'\033[0;34m' green=$'\033[0;32m' reset=$'\033[0m' tab=$'\t'
   local -A colors=(
     [monad-bft]="$purple"
@@ -488,8 +492,8 @@ EOF
   fi
 
   MF_BUCKET=https://bucket.monadinfra.com
-  curl -o /home/monad/.env $MF_BUCKET/config/${NETWORK}/latest/.env.example
-  curl -o /home/monad/monad-bft/config/node.toml $MF_BUCKET/config/${NETWORK}/latest/full-node-node.toml
+  curl -fsSL -o /home/monad/.env "$MF_BUCKET/config/${NETWORK}/latest/.env.example"
+  curl -fsSL -o /home/monad/monad-bft/config/node.toml "$MF_BUCKET/config/${NETWORK}/latest/full-node-node.toml"
 
   sed -i "s|^KEYSTORE_PASSWORD=$|KEYSTORE_PASSWORD='$(openssl rand -base64 32)'|" /home/monad/.env
   set +x
