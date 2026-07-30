@@ -231,7 +231,7 @@ cmd_logs() {
   '
 
   for unit in "${units[@]}"; do
-    if [[ "$unit" == "monad-bft" ]]; then
+    if [[ "$unit" == "monad-bft" || "$unit" == "monad-rpc" ]]; then
       if [[ ${#units[@]} -gt 1 ]]; then
         journalctl -u "$unit" -f -o cat |
           jq --unbuffered -Rr "$bft_level_filter" |
@@ -239,7 +239,7 @@ cmd_logs() {
       else
         journalctl -u "$unit" -f -o cat | jq --unbuffered -Rr "$bft_level_filter" &
       fi
-    elif [[ "$unit" == "monad-execution" ]]; then
+    else
       if [[ ${#units[@]} -gt 1 ]]; then
         journalctl -u "$unit" -f -o cat |
           sed -Eu "$execution_ts_strip" |
@@ -249,12 +249,6 @@ cmd_logs() {
         journalctl -u "$unit" -f -o cat |
           sed -Eu "$execution_ts_strip" |
           jq --unbuffered -Rr "$execution_level_filter" &
-      fi
-    else
-      if [[ ${#units[@]} -gt 1 ]]; then
-        journalctl -u "$unit" -f -o cat | sed -u "s/^/${colors[$unit]}${unit}${reset}${tab}${tab}/" &
-      else
-        journalctl -u "$unit" -f -o cat &
       fi
     fi
   done
