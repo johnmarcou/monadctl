@@ -35,6 +35,7 @@ Usage:
   monadctl edit            # edit node configuration
   monadctl flush           # clear workspace, database and logs
   monadctl init            # initialise node configuration
+  monadctl logs            # follow monad-bft logs (default)
   monadctl reload          # reload monad configuration
   monadctl reset           # reset the node
   monadctl reset --hard    # reset the node and import latest snapshot
@@ -49,6 +50,7 @@ Examples:
   monadctl up --network mainnet --disk nvme1n1
   monadctl up --network mainnet --disk nvme1n1 --version 0.15.2
   monadctl up --network mainnet --disk nvme1n1 --deb /path/to/monad.deb
+  monadctl logs --rpc --execution
 
 Init/up options:
   --network <name>       # network to join (default: mainnet)
@@ -58,6 +60,13 @@ Init/up options:
   --deb <path>            # install the monad package from a local .deb file instead of apt
   --seq-num <n>           # self-record sequence number (default: 0)
 
+Logs options (always follows, like tail -f):
+  -b, --bft                       # monad-bft logs (default when no flag is given)
+  -e, --exec, --execution         # monad-execution logs
+  -r, --rpc                       # monad-rpc logs
+  -a, --all                       # all three services
+  Flags are additive; passing any of -b/-e/-r drops the bft-only default.
+
 EOF
 }
 
@@ -66,6 +75,10 @@ main() {
   init)
     shift
     cmd_init "$@"
+    ;;
+  logs)
+    shift
+    cmd_logs "$@"
     ;;
   status)
     shift
@@ -97,6 +110,155 @@ cmd_config() {
 
 cmd_edit() {
   exec "${EDITOR:-vi}" $CONFIG_FILE </dev/tty >/dev/tty 2>&1
+}
+
+cmd_logs() {
+  local bft=false execution=false rpc=false all=false any_selected=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -b | --bft)
+      bft=true
+      any_selected=true
+      shift
+      ;;
+    -e | --exec | --execution)
+      execution=true
+      any_selected=true
+      shift
+      ;;
+    -r | --rpc)
+      rpc=true
+      any_selected=true
+      shift
+      ;;
+    -a | --all)
+      all=true
+      shift
+      ;;
+    -*)
+      echo "Unknown option for logs: $1" >&2
+      exit 1
+      ;;
+    *)
+      echo "Unknown argument for logs: $1" >&2
+      exit 1
+      ;;
+    esac
+  done
+
+  if $all; then
+    bft=true
+    execution=true
+    rpc=true
+  elif ! $any_selected; then
+    bft=true
+  fi
+
+  local units=()
+  $bft && units+=("monad-bft")
+  $execution && units+=("monad-execution")
+  $rpc && units+=("monad-rpc")
+
+  local purple=$'\033[0;35m' blue=$'\033[0;34m' green=$'\033[0;32m' reset=$'\033[0m' tab=$'\t'
+  local -A colors=(
+    [monad-bft]="$purple"
+    [monad-execution]="$blue"
+    [monad-rpc]="$green"
+  )
+
+  # LEVEL keeps its severity color; target + payload are colorized by a
+  # hash of the target field, so each target keeps a stable, distinct color
+  local bft_level_filter='
+    . as $raw
+    | ["92","96","34","95","93","35","94","32","31","91","33","36"] as $palette
+    | 36 as $width
+    | 10 as $lvl_width
+    | try (
+      fromjson as $obj
+      | ($obj.level // "") as $lvl
+      | (
+          if $lvl == "ERROR" then "[0;31m"
+          elif $lvl == "WARN" then "[0;33m"
+          elif $lvl == "INFO" then "[0;32m"
+          elif $lvl == "DEBUG" then "[0;36m"
+          elif $lvl == "TRACE" then "[0;90m"
+          else "[0m" end
+        ) as $lvlcolor
+      | ($obj.target // "") as $target
+      | ($target | explode | add // 0) as $hashsum
+      | $palette[$hashsum % ($palette | length)] as $code
+      | ("[0;" + $code + "m") as $svccolor
+      | ($target | length) as $tlen
+      | (if $tlen < $width then $target + (" " * ($width - $tlen)) else $target end) as $paddedtarget
+      | ($lvl | length) as $llen
+      | (if $llen < $lvl_width then $lvl + (" " * ($lvl_width - $llen)) else $lvl end) as $paddedlvl
+      | ($obj | del(.timestamp, .level, .target) | tojson) as $message
+      | "\($svccolor)\($paddedtarget)\($lvlcolor)\($paddedlvl)\($svccolor)\($message)[0m"
+    ) catch $raw
+  '
+
+  local execution_ts_strip='s/^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+ \[[0-9]+\] //'
+
+  local execution_level_filter='
+    . as $raw
+    | ["92","96","34","95","93","35","94","32","31","91","33","36"] as $palette
+    | 36 as $svc_width
+    | 10 as $lvl_width
+    | try (
+      capture("^(?<service>\\S+)\\s+(?<level>\\S+)\\s+(?<message>.*)$") as $m
+      | ($m.service) as $service
+      | ($m.level) as $level
+      | ($m.message) as $message
+      | ($service | sub("(:[0-9]+)$"; "")) as $service_key
+      | (
+          if ($level | test("ERROR")) then "[0;31m"
+          elif ($level | test("WARN")) then "[0;33m"
+          elif ($level | test("INFO")) then "[0;32m"
+          elif ($level | test("DEBUG")) then "[0;36m"
+          elif ($level | test("TRACE")) then "[0;90m"
+          else "[0m" end
+        ) as $lvlcolor
+      | ($service_key | explode | add // 0) as $hashsum
+      | $palette[$hashsum % ($palette | length)] as $code
+      | ("[0;" + $code + "m") as $svccolor
+      | ($service | length) as $slen
+      | (if $slen < $svc_width then $service + (" " * ($svc_width - $slen)) else $service end) as $paddedsvc
+      | ($level | length) as $llen
+      | (if $llen < $lvl_width then $level + (" " * ($lvl_width - $llen)) else $level end) as $paddedlvl
+      | "\($svccolor)\($paddedsvc)\($lvlcolor)\($paddedlvl)\($svccolor)\($message)[0m"
+    ) catch $raw
+  '
+
+  for unit in "${units[@]}"; do
+    if [[ "$unit" == "monad-bft" ]]; then
+      if [[ ${#units[@]} -gt 1 ]]; then
+        journalctl -u "$unit" -f -o cat |
+          jq --unbuffered -Rr "$bft_level_filter" |
+          sed -u "s/^/${colors[$unit]}${unit}${reset}${tab}${tab}/" &
+      else
+        journalctl -u "$unit" -f -o cat | jq --unbuffered -Rr "$bft_level_filter" &
+      fi
+    elif [[ "$unit" == "monad-execution" ]]; then
+      if [[ ${#units[@]} -gt 1 ]]; then
+        journalctl -u "$unit" -f -o cat |
+          sed -Eu "$execution_ts_strip" |
+          jq --unbuffered -Rr "$execution_level_filter" |
+          sed -u "s/^/${colors[$unit]}${unit}${reset}${tab}${tab}/" &
+      else
+        journalctl -u "$unit" -f -o cat |
+          sed -Eu "$execution_ts_strip" |
+          jq --unbuffered -Rr "$execution_level_filter" &
+      fi
+    else
+      if [[ ${#units[@]} -gt 1 ]]; then
+        journalctl -u "$unit" -f -o cat | sed -u "s/^/${colors[$unit]}${unit}${reset}${tab}${tab}/" &
+      else
+        journalctl -u "$unit" -f -o cat &
+      fi
+    fi
+  done
+  wait
 }
 
 cmd_status() {
