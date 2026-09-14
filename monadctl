@@ -59,6 +59,8 @@ Init/up options:
   --version <version>     # pin the monad package to a specific published apt version
   --deb <path>            # install the monad package from a local .deb file instead of apt
   --seq-num <n>           # self-record sequence number (default: 0)
+  --node-toml-url <url|path>  # node.toml template to fetch, or a local file path (default: <bucket>/config/<network>/latest/full-node-node.toml)
+  --no-auto-start         # (up only) don't start monad services at the end
 
 Logs options (always follows, like tail -f):
   -b, --bft                       # monad-bft logs (default when no flag is given)
@@ -166,9 +168,9 @@ cmd_logs() {
 
   local purple=$'\033[0;35m' blue=$'\033[0;34m' green=$'\033[0;32m' reset=$'\033[0m' tab=$'\t'
   local -A colors=(
-    [monad-bft]="$purple"
-    [monad-execution]="$blue"
-    [monad-rpc]="$green"
+    [monad - bft]="$purple"
+    [monad - execution]="$blue"
+    [monad - rpc]="$green"
   )
 
   # LEVEL keeps its severity color; target + payload are colorized by a
@@ -286,8 +288,23 @@ cmd_reload() {
 }
 
 cmd_up() {
-  cmd_init "$@"
-  cmd_hard_reset
+  local no_auto_start=false
+  local args=()
+  for arg in "$@"; do
+    if [[ "$arg" == "--no-auto-start" ]]; then
+      no_auto_start=true
+    else
+      args+=("$arg")
+    fi
+  done
+
+  cmd_init "${args[@]}"
+
+  if $no_auto_start; then
+    cmd_hard_reset --no-start
+  else
+    cmd_hard_reset
+  fi
 }
 
 cmd_down() {
@@ -335,6 +352,11 @@ cmd_soft_reset() {
 }
 
 cmd_hard_reset() {
+  local start=true
+  if [[ "${1:-}" == "--no-start" ]]; then
+    start=false
+  fi
+
   cmd_stop
 
   NETWORK=$(grep -Po '^network_name\s*=\s*"?\K[^"#]+' $CONFIG_FILE)
@@ -343,7 +365,9 @@ cmd_hard_reset() {
   bash /opt/monad/scripts/reset-workspace.sh
   curl -fsSL "${MF_BUCKET}/scripts/${NETWORK}/restore-from-snapshot.sh" | bash
 
-  cmd_start
+  if $start; then
+    cmd_start
+  fi
 }
 
 cmd_init() {
@@ -353,6 +377,7 @@ cmd_init() {
   VERSION=""
   DEB=""
   LOOPBACK_DISK=""
+  NODE_TOML_URL=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -378,6 +403,10 @@ cmd_init() {
       ;;
     --seq-num)
       SEQ_NUM="$2"
+      shift 2
+      ;;
+    --node-toml-url)
+      NODE_TOML_URL="$2"
       shift 2
       ;;
     -*)
@@ -473,6 +502,7 @@ EOF
   ufw allow ssh
   ufw allow 8000
   ufw allow 8001
+  ufw allow 8002
   ufw --force enable
 
   OTEL_VERSION="0.139.0"
@@ -492,8 +522,15 @@ EOF
   fi
 
   MF_BUCKET=https://bucket.monadinfra.com
+  if [[ -z "$NODE_TOML_URL" ]]; then
+    NODE_TOML_URL="$MF_BUCKET/config/${NETWORK}/latest/full-node-node.toml"
+  fi
   curl -fsSL -o /home/monad/.env "$MF_BUCKET/config/${NETWORK}/latest/.env.example"
-  curl -fsSL -o /home/monad/monad-bft/config/node.toml "$MF_BUCKET/config/${NETWORK}/latest/full-node-node.toml"
+  if [[ "$NODE_TOML_URL" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*:// ]]; then
+    curl -fsSL -o /home/monad/monad-bft/config/node.toml "$NODE_TOML_URL"
+  else
+    cp "$NODE_TOML_URL" /home/monad/monad-bft/config/node.toml
+  fi
 
   sed -i "s|^KEYSTORE_PASSWORD=$|KEYSTORE_PASSWORD='$(openssl rand -base64 32)'|" /home/monad/.env
   set +x
@@ -522,26 +559,38 @@ EOF
   source /home/monad/.env
   set -x
   NODE_IP="$(curl -s4 ifconfig.me)"
-  if dpkg --compare-versions "$VERSION" le "0.15.1"; then
-    ADDRESS_FLAGS=(--address "${NODE_IP}:8000")
-  else
-    ADDRESS_FLAGS=(--ip "$NODE_IP" --tcp-port 8000 --udp-port 8000)
-  fi
 
-  sig_out="$(
-    monad-sign-name-record \
-      "${ADDRESS_FLAGS[@]}" \
-      --authenticated-udp-port 8001 \
-      --keystore-path /home/monad/monad-bft/config/id-secp \
-      --password "${KEYSTORE_PASSWORD}" \
-      --self-record-seq-num "${SEQ_NUM}"
-  )"
+  if [[ "$NETWORK" == "mainnet" ]]; then
+    sig_out="$(
+      monad-sign-name-record \
+        --ip "$NODE_IP" \
+        --tcp-port 8000 \
+        --udp-port 8000 \
+        --authenticated-udp-port 8001 \
+        --keystore-path /home/monad/monad-bft/config/id-secp \
+        --password "${KEYSTORE_PASSWORD}" \
+        --self-record-seq-num "${SEQ_NUM}"
+    )"
+  else
+    sig_out="$(
+      monad-sign-name-record \
+        --ip "$NODE_IP" \
+        --tcp-port 8000 \
+        --authenticated-udp-port 8001 \
+        --direct-udp-port 8002 \
+        --keystore-path /home/monad/monad-bft/config/id-secp \
+        --password "${KEYSTORE_PASSWORD}" \
+        --self-record-seq-num "${SEQ_NUM}"
+    )"
+  fi
 
   node_name_val="$(hostname)"
   self_address=$(printf '%s\n' "$sig_out" | grep '^self_address' | cut -d'"' -f2)
-  self_tcp_port=$(printf '%s\n' "$sig_out" | grep '^self_tcp_port' | awk '{print $3}' || true)
-  if [[ -n "$self_tcp_port" && "$self_address" != *:* ]]; then
-    self_address="${self_address}:${self_tcp_port}"
+  if [[ "$NETWORK" == "mainnet" ]]; then
+    self_tcp_port=$(printf '%s\n' "$sig_out" | grep '^self_tcp_port' | awk '{print $3}' || true)
+    if [[ -n "$self_tcp_port" && "$self_address" != *:* ]]; then
+      self_address="${self_address}:${self_tcp_port}"
+    fi
   fi
   self_record_seq_num=$(printf '%s\n' "$sig_out" | grep '^self_record_seq_num' | awk '{print $3}')
   self_name_record_sig=$(printf '%s\n' "$sig_out" | grep '^self_name_record_sig' | cut -d'"' -f2)
